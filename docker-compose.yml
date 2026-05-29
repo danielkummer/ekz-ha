@@ -1,0 +1,27 @@
+services:
+  ekz-scraper:
+    build: .
+    restart: unless-stopped
+    # Docker builds for the host architecture automatically (arm64 on a
+    # Raspberry Pi, amd64 on a PC). Only set `platform:` if you cross-build.
+    # platform: linux/arm64
+    environment:
+      # The scrape schedule is local wall-clock time — keep this in sync with
+      # ekz.scrape_time in config.yaml. Europe/Zurich also handles DST correctly.
+      TZ: Europe/Zurich
+      # Prevent Chromium from inheriting a @posix locale tag from the host,
+      # which causes RangeError in Date.toLocaleDateString inside the Vue app.
+      LANG: "en_US.UTF-8"
+      LC_ALL: "en_US.UTF-8"
+    volumes:
+      # All configuration lives in config.yaml — copy config.yaml.example to get started.
+      - ./config.yaml:/app/config.yaml:ro
+      # Scraped data is stored here on the host. Edit this path if you want a
+      # different location; the container always sees it as /app/data.
+      - ./data:/app/data
+      # Only needed when rsync.target is set in config.yaml — mount the SSH key:
+      # - ./ssh/id_ed25519:/root/.ssh/id_ed25519:ro
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 2.0
+    shm_size: '256m'

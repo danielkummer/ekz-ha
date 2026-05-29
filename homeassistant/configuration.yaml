@@ -1,0 +1,12 @@
+# Minimal configuration.yaml snippet to enable the EKZ Power sensors.
+# Place this in your Home Assistant config/configuration.yaml.
+#
+# data_dir must be the path to the CSV files as seen by the HA container/process.
+# bills_dir defaults to <data_dir>/../bills if omitted.
+# See the README for how to mount the volume.
+
+sensor:
+  - platform: ekz_power
+    data_dir: /media/ekz-ha/csv
+    bills_dir: /media/ekz-ha/bills
+    scan_interval: 3600          # re-read CSVs every hour

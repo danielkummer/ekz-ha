@@ -1,0 +1,62 @@
+# EKZ for Home Assistant — configuration file
+#
+# Copy this file to config.yaml and fill in your values.
+# config.yaml is gitignored — never commit it with real credentials.
+#
+# The only environment variable still honoured is EKZ_CONFIG_FILE,
+# which overrides the path to this file (default: ./config.yaml).
+
+ekz:
+  username: your@email.com
+  password: your_password
+  # Substring of the meter label shown in the portal.
+  # Any unique fragment works — you don't need the full label.
+  address: "Your Street 42"
+  # Daily scrape time (HH:MM, Europe/Zurich timezone). Default: 06:00
+  scrape_time: "06:00"
+  # Set to false to watch the browser window (useful for debugging selector issues)
+  headless: true
+  # On transient failures, retry up to this many times before giving up for the day.
+  # Between retries the scraper sleeps with exponential backoff + random jitter
+  # (base delay doubles each attempt, capped at 4 hours).
+  max_retries: 3
+  retry_backoff_base_minutes: 15
+
+home_assistant:
+  # Base URL of your Home Assistant instance
+  url: http://homeassistant.local:8123
+  # Long-Lived Access Token — create one at http://<ha-host>:8123/profile/security
+  token: your_long_lived_access_token
+
+rsync:
+  # Push the data/ directory to a remote host after each scrape.
+  # Format: user@host:/absolute/path — leave empty or omit to disable.
+  # Requires an SSH key at ./ssh/id_ed25519 (see README).
+  target: ""
+
+tariff:
+  # Flat electricity price in CHF per kWh, used for cost *estimates* and the
+  # cost long-term statistics (ekz_power:daily_cost_chf, :monthly_cost_kwh_chf).
+  # This is a single forward-looking rate — your actual blended rate from bills
+  # is still exposed separately as sensor.ekz_cost_per_kwh.
+  #
+  # Find your rate on a recent EKZ invoice, or in the "Total" row (Rp./kWh) of
+  # the official tariff table:
+  #   https://www.ekz.ch/de/angebote/strom/tarife/stromtarife-privatkunden.html
+  # Divide Rappen by 100 to get CHF (e.g. 25.93 Rp./kWh -> 0.26). EKZ tariffs
+  # vary by quarter; pick an annual average if you want one flat number.
+  # Note: this is a per-kWh consumption rate only — fixed monthly charges
+  # (Grundtarif / Messtarif) are not included in the estimates.
+  cost_per_kwh: 0.25
+
+# Log verbosity: INFO (default) or DEBUG.
+# DEBUG also writes intermediate browser screenshots and HTML dumps to data/debug/
+# which is invaluable when diagnosing portal selector failures.
+log_level: "INFO"
+
+retention:
+  # Number of days to keep files in each directory. Set to 0 to disable cleanup.
+  # Bills (data/bills/) are never deleted regardless of this setting.
+  csv_days: 365        # daily / monthly / yearly CSV files (1 year)
+  screenshot_days: 30  # chart screenshots in data/screenshots/
+  debug_days: 7        # debug screenshots / HTML dumps in data/debug/

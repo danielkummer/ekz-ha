@@ -1,0 +1,10 @@
+# Core dependencies (required)
+playwright>=1.49.0
+schedule==1.2.2
+requests>=2.32
+websockets>=13.0
+PyYAML>=6.0
+
+# Optional dependencies - install with: pip install -r requirements-optional.txt
+# pdfplumber>=0.11    # Only needed for PDF invoice amount parsing fallback
+#                     # (amounts are extracted from HTML by default)

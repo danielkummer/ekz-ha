@@ -1,0 +1,8 @@
+{
+  "domain": "ekz_power",
+  "name": "EKZ Power Usage",
+  "documentation": "",
+  "requirements": [],
+  "iot_class": "local_polling",
+  "version": "1.0.0"
+}

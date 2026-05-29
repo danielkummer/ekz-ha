@@ -1,0 +1,136 @@
+# EKZ Energy — importable Home Assistant dashboard view
+# ---------------------------------------------------------------------------
+# A complete, genericized "sections" view for your EKZ electricity data.
+# Core cards only — no HACS / custom cards required.
+#
+# How to use:
+#   1. Open the target dashboard → ⋮ → Edit Dashboard → ⋮ → Raw configuration
+#      editor.
+#   2. Paste the block below as a new item under `views:`.
+#   3. Save.
+#
+# Entity IDs assume the recommended DIRECT-PUSH setup (sensor.ekz_* +
+# ekz_power:* statistics). If you only run the custom component, some health
+# sensors and cost statistics won't exist — remove those cards.
+#
+# Set tariff.cost_per_kwh in config.yaml so the cost charts reflect real prices.
+# ---------------------------------------------------------------------------
+title: EKZ Energy
+path: ekz-energy
+icon: mdi:transmission-tower
+type: sections
+max_columns: 2
+sections:
+  - type: grid
+    title: At a glance
+    cards:
+      - type: tile
+        entity: sensor.ekz_latest_day_kwh
+        name: Latest day
+        icon: mdi:lightning-bolt
+      - type: tile
+        entity: sensor.ekz_current_month_kwh
+        name: This month
+        icon: mdi:calendar-month
+      - type: tile
+        entity: sensor.ekz_year_to_date_kwh
+        name: Year to date
+        icon: mdi:chart-line
+      - type: tile
+        entity: sensor.ekz_current_month_cost_estimate
+        name: Est. cost (month)
+        icon: mdi:cash
+      - type: gauge
+        entity: sensor.ekz_current_month_kwh
+        name: Monthly usage
+        # Adjust max to your own typical monthly consumption (kWh).
+        # A 3-person household in CH averages roughly 300-400 kWh/month.
+        min: 0
+        max: 400
+        needle: true
+        severity:
+          green: 0
+          yellow: 250
+          red: 350
+
+  - type: grid
+    title: Consumption
+    cards:
+      - type: statistics-graph
+        title: Monthly usage (kWh)
+        entities:
+          - statistic: ekz_power:monthly_kwh
+            name: Monthly kWh
+        period: month
+        stat_types:
+          - state
+        chart_type: bar
+      - type: statistics-graph
+        title: Daily usage (kWh)
+        entities:
+          - statistic: ekz_power:daily_kwh
+            name: Daily kWh
+        period: day
+        stat_types:
+          - state
+        chart_type: bar
+
+  - type: grid
+    title: Cost
+    cards:
+      - type: statistics-graph
+        title: Daily cost (CHF, estimated)
+        entities:
+          - statistic: ekz_power:daily_cost_chf
+            name: Daily cost
+        period: day
+        stat_types:
+          - state
+        chart_type: bar
+      - type: statistics-graph
+        title: Cumulative billed cost (CHF)
+        entities:
+          - statistic: ekz_power:monthly_cost_chf
+            name: Cumulative
+        period: month
+        stat_types:
+          - sum
+        chart_type: line
+      - type: entities
+        title: Cost overview
+        entities:
+          - entity: sensor.ekz_cost_per_kwh
+            name: Actual rate (from bills)
+          - entity: sensor.ekz_daily_cost_estimate
+            name: Daily estimate
+          - entity: sensor.ekz_current_month_cost_estimate
+            name: This month estimate
+          - entity: sensor.ekz_latest_bill_chf
+            name: Latest bill
+          - entity: sensor.ekz_total_billed_chf
+            name: Total billed
+
+  - type: grid
+    title: Status & freshness
+    cards:
+      - type: markdown
+        content: >
+          **EKZ data**
+
+
+          Latest consumption: {{ state_attr('sensor.ekz_latest_day_kwh',
+          'data_date') }}
+
+
+          Latest bill period: {{ state_attr('sensor.ekz_latest_bill_chf',
+          'period_start') }} to {{ state_attr('sensor.ekz_latest_bill_chf',
+          'period_end') }}
+      - type: entities
+        title: Scraper health (direct-push only)
+        entities:
+          - entity: sensor.ekz_scrape_status
+          - entity: sensor.ekz_scrape_age_hours
+          - entity: binary_sensor.ekz_data_stale
+          - entity: binary_sensor.ekz_auth_required
+          - entity: binary_sensor.ekz_ha_connected
+          - entity: sensor.ekz_ha_push_success_rate

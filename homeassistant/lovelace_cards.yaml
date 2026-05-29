@@ -1,0 +1,274 @@
+# Lovelace dashboard card examples for EKZ Power Usage.
+# Paste these into your dashboard YAML (raw config editor).
+
+# -------------------------------------------------------------------------
+# 1. Simple stats overview — entities card
+# -------------------------------------------------------------------------
+type: entities
+title: EKZ Power Usage
+entities:
+  - entity: sensor.ekz_latest_day_kwh
+    name: Yesterday / Latest Day
+    icon: mdi:lightning-bolt
+  - entity: sensor.ekz_latest_day_ht_kwh
+    name: "  \u2514 HT (peak)"
+  - entity: sensor.ekz_latest_day_nt_kwh
+    name: "  \u2514 NT (off-peak)"
+  - entity: sensor.ekz_current_month_kwh
+    name: This Month
+    icon: mdi:calendar-month
+  - entity: sensor.ekz_year_to_date_kwh
+    name: Year to Date
+    icon: mdi:chart-line
+  - type: divider
+  - entity: sensor.ekz_latest_bill_chf
+    name: Latest Invoice
+    icon: mdi:receipt-text
+  - entity: sensor.ekz_total_billed_chf
+    name: Total Billed
+    icon: mdi:cash-multiple
+
+---
+# -------------------------------------------------------------------------
+# 2. Monthly bill amounts — bar chart
+#    Uses the long-term statistic injected by the custom component.
+#    state = per-bill CHF amount.
+# -------------------------------------------------------------------------
+type: statistics-graph
+title: EKZ Monthly Costs (CHF)
+entities:
+  - statistic: ekz_power:monthly_cost_chf
+    name: Bill Amount
+period: month
+stat_types:
+  - state
+chart_type: bar
+
+---
+# -------------------------------------------------------------------------
+# 3. Cumulative year-to-date cost — line chart
+#    sum = running total injected alongside each bill.
+# -------------------------------------------------------------------------
+type: statistics-graph
+title: EKZ Cumulative Cost Year-to-Date (CHF)
+entities:
+  - statistic: ekz_power:monthly_cost_chf
+    name: Cumulative
+period: month
+stat_types:
+  - sum
+chart_type: line
+
+---
+# -------------------------------------------------------------------------
+# 4. Monthly usage — bar chart (kWh)
+#    Uses the ekz_power:monthly_kwh long-term statistic (direct-push path).
+# -------------------------------------------------------------------------
+type: statistics-graph
+title: EKZ Monthly Usage (kWh)
+entities:
+  - statistic: ekz_power:monthly_kwh
+    name: Monthly kWh
+period: month
+stat_types:
+  - state
+chart_type: bar
+
+---
+# -------------------------------------------------------------------------
+# 4b. Daily usage — bar chart (kWh)
+#     Uses ekz_power:daily_kwh (direct-push path).
+# -------------------------------------------------------------------------
+type: statistics-graph
+title: EKZ Daily Usage (kWh)
+entities:
+  - statistic: ekz_power:daily_kwh
+    name: Daily kWh
+period: day
+stat_types:
+  - state
+chart_type: bar
+
+---
+# -------------------------------------------------------------------------
+# 4c. Estimated cost over time — bar chart (CHF)
+#     Uses ekz_power:daily_cost_chf (daily kWh x your tariff.cost_per_kwh).
+#     Set your rate in config.yaml so this reflects real prices.
+# -------------------------------------------------------------------------
+type: statistics-graph
+title: EKZ Daily Cost (CHF, estimated)
+entities:
+  - statistic: ekz_power:daily_cost_chf
+    name: Daily cost
+period: day
+stat_types:
+  - state
+chart_type: bar
+
+---
+# -------------------------------------------------------------------------
+# 4d. Cumulative estimated cost — line chart (CHF)
+#     sum = running total of estimated monthly cost.
+# -------------------------------------------------------------------------
+type: statistics-graph
+title: EKZ Cumulative Cost (CHF, estimated)
+entities:
+  - statistic: ekz_power:monthly_cost_kwh_chf
+    name: Cumulative
+period: month
+stat_types:
+  - sum
+chart_type: line
+
+---
+# -------------------------------------------------------------------------
+# 5. Gauge — how does this month compare to 250 kWh typical?
+# -------------------------------------------------------------------------
+type: gauge
+title: Monthly Usage
+entity: sensor.ekz_current_month_kwh
+min: 0
+max: 250
+needle: true
+severity:
+  green: 0
+  yellow: 150
+  red: 200
+
+---
+# -------------------------------------------------------------------------
+# 6. Bill summary card
+# -------------------------------------------------------------------------
+type: entities
+title: EKZ Bills
+entities:
+  - entity: sensor.ekz_latest_bill_chf
+    name: Most Recent Bill
+    icon: mdi:receipt-text
+    secondary_info: last-changed
+  - entity: sensor.ekz_total_billed_chf
+    name: Total Billed (all periods)
+    icon: mdi:cash-multiple
+
+---
+# -------------------------------------------------------------------------
+# 7. Freshness / data source info
+# -------------------------------------------------------------------------
+type: markdown
+content: >
+  **EKZ data**
+
+  Latest consumption: {{ state_attr('sensor.ekz_latest_day_kwh', 'data_date') }}
+
+  Latest bill period: {{ state_attr('sensor.ekz_latest_bill_chf', 'period_start') }}
+  to {{ state_attr('sensor.ekz_latest_bill_chf', 'period_end') }}
+
+---
+# =========================================================================
+# OPTIONAL: HACS cards
+# The cards below require custom frontend cards installed via HACS.
+# Everything above uses only built-in Home Assistant cards.
+# =========================================================================
+
+# -------------------------------------------------------------------------
+# 8. (Optional - requires HACS apexcharts-card)
+#    Rich bill chart reading from the monthly_costs attribute —
+#    shows both per-bill bars and a cumulative line on the same chart.
+# -------------------------------------------------------------------------
+type: custom:apexcharts-card
+title: EKZ Bills - Amount & Cumulative
+header:
+  show: true
+graph_span: 2y
+series:
+  - entity: sensor.ekz_total_billed_chf
+    name: Per Bill (CHF)
+    type: column
+    data_generator: |
+      return entity.attributes.monthly_costs.map(b => ({
+        x: new Date(b.period_end),
+        y: b.amount_chf
+      }));
+  - entity: sensor.ekz_total_billed_chf
+    name: Cumulative (CHF)
+    type: line
+    data_generator: |
+      return entity.attributes.monthly_costs.map(b => ({
+        x: new Date(b.period_end),
+        y: b.cumulative_chf
+      }));
+
+---
+# -------------------------------------------------------------------------
+# 9. (Optional - requires HACS apexcharts-card)
+#    Dual-axis: monthly kWh (bars) + estimated cost (line) on one chart.
+# -------------------------------------------------------------------------
+type: custom:apexcharts-card
+title: EKZ Energy & Cost
+graph_span: 1y
+header:
+  show: true
+series:
+  - entity: ekz_power:monthly_kwh
+    name: Consumption (kWh)
+    type: column
+    statistics:
+      type: state
+      period: month
+  - entity: ekz_power:monthly_cost_kwh_chf
+    name: Cost (CHF)
+    type: line
+    statistics:
+      type: state
+      period: month
+yaxis:
+  - id: kwh
+    apex_config:
+      title:
+        text: kWh
+  - id: cost
+    opposite: true
+    apex_config:
+      title:
+        text: CHF
+
+---
+# -------------------------------------------------------------------------
+# 10. (Optional - requires HACS mushroom)
+#     Compact at-a-glance summary tiles.
+# -------------------------------------------------------------------------
+type: horizontal-stack
+cards:
+  - type: custom:mushroom-entity-card
+    entity: sensor.ekz_current_month_kwh
+    name: This Month
+    icon: mdi:calendar-month
+  - type: custom:mushroom-entity-card
+    entity: sensor.ekz_current_month_cost_estimate
+    name: Est. Cost
+    icon: mdi:cash
+  - type: custom:mushroom-entity-card
+    entity: sensor.ekz_latest_day_kwh
+    name: Latest Day
+    icon: mdi:lightning-bolt
+
+---
+# -------------------------------------------------------------------------
+# 11. Combine EKZ whole-home total with your own smart plugs.
+#     Replace the placeholder entity IDs with your real smart-plug sensors.
+#     Useful to see how much of your EKZ-metered usage a device accounts for.
+#     (Core history-graph card — no HACS needed.)
+# -------------------------------------------------------------------------
+type: history-graph
+title: Whole-home vs. individual devices
+hours_to_show: 168
+entities:
+  - entity: sensor.ekz_latest_day_kwh
+    name: EKZ whole-home (daily kWh)
+  # --- replace the lines below with your own smart-plug energy sensors ---
+  - entity: sensor.YOUR_SMART_PLUG_1_energy
+    name: Device 1
+  - entity: sensor.YOUR_SMART_PLUG_2_energy
+    name: Device 2
+
+

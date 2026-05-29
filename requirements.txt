@@ -1,0 +1,10 @@
+# Core dependencies
+playwright>=1.49.0
+schedule==1.2.2
+requests>=2.32
+websockets>=13.0
+PyYAML>=6.0
+
+# Optional: PDF invoice amount parsing (fallback only - amounts extracted from HTML by default)
+pdfplumber>=0.11
+

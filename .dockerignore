@@ -1,0 +1,22 @@
+# Secrets and local config — never copy into the image
+.env
+config.yaml
+ssh/
+
+# Runtime data and virtualenv
+data/
+.venv/
+
+# Caches and OS cruft
+__pycache__/
+*.pyc
+.DS_Store
+
+# Version control and local-only docs
+.git/
+AGENTS.md
+FUTURE_PHASES.md
+REVIEW_FINDINGS.md
+IMPLEMENTATION_SUMMARY.md
+IMPROVEMENT_ROADMAP.md
+PHASE2_IMPLEMENTATION_SUMMARY.md
