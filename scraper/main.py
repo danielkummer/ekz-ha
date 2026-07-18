@@ -16,7 +16,7 @@ import schedule
 from .config import Config, load_config
 from .scraper import PermanentScrapeError, run_scrape
 from .sync import rsync_data
-from .ha_push import push_to_ha
+from .ha_push import push_to_ha, republish_to_ha
 from .cleanup import run_cleanup
 
 logger = logging.getLogger("scraper.main")
@@ -232,6 +232,21 @@ def _scrape_job(config: Config) -> None:
         logger.info("═══════════════════════════════════════════════════════════")
 
 
+def _republish_job(config: Config) -> None:
+    """Re-push ephemeral HA states so entities survive Home Assistant restarts.
+
+    Reads the already-scraped CSVs (no browser/scrape) and re-sends sensor
+    states. Cheap and isolated — never raises into the scheduler loop.
+    """
+    if not config.ha_url:
+        return
+    try:
+        republish_to_ha(config.ha_url, config.ha_token, config.data_dir, config.cost_per_kwh)
+        logger.debug("HA state re-push completed")
+    except Exception:
+        logger.exception("HA state re-push failed — will retry next interval")
+
+
 def check_config() -> None:
     """Validate config and exit with status code."""
     try:
@@ -241,6 +256,8 @@ def check_config() -> None:
         print(f"  Address     : {config.address}")
         print(f"  Data dir    : {config.data_dir}")
         print(f"  HA push     : {'enabled (' + config.ha_url + ')' if config.ha_url else 'disabled (no URL configured)'}")
+        if config.ha_url:
+            print(f"  HA re-push  : {'every ' + str(config.ha_republish_minutes) + ' min' if config.ha_republish_minutes else 'disabled'}")
         print(f"  Rsync       : {'enabled (' + config.rsync_target + ')' if config.rsync_target else 'disabled'}")
         print(f"  Retention   : CSV {config.retention.csv_days}d, screenshots {config.retention.screenshot_days}d")
         print(f"  Log level   : {config.log_level}")
@@ -285,6 +302,10 @@ def main() -> None:
     # Explicit HA push status with URL
     if config.ha_url:
         logger.info("  HA push     : enabled → %s", config.ha_url)
+        if config.ha_republish_minutes > 0:
+            logger.info("  HA re-push  : every %d min (survives HA restarts)", config.ha_republish_minutes)
+        else:
+            logger.info("  HA re-push  : disabled")
     else:
         logger.info("  HA push     : disabled (no URL configured)")
     
@@ -302,11 +323,25 @@ def main() -> None:
     # Skip startup scrape if last successful run was recent
     if _should_skip_scrape(config.data_dir, min_hours=6.0):
         logger.info("Skipping startup scrape — last successful run was < 6 hours ago")
+        # Still (re)publish states now so entities exist immediately after a
+        # container/HA restart, even when the scrape itself is skipped.
+        _republish_job(config)
     else:
         _scrape_job(config)
-    
+
     schedule.every().day.at(config.scrape_time).do(_scrape_job, config)
     logger.info("Scheduler active — next scrape daily at %s", config.scrape_time)
+
+    # Periodically re-push ephemeral HA states so the dashboard survives HA
+    # restarts between daily scrapes (root cause of "entity not found").
+    if config.ha_url and config.ha_republish_minutes > 0:
+        schedule.every(config.ha_republish_minutes).minutes.do(_republish_job, config)
+        logger.info(
+            "HA state re-push active — every %d min (keeps entities alive across HA restarts)",
+            config.ha_republish_minutes,
+        )
+    elif config.ha_url:
+        logger.info("HA state re-push disabled (home_assistant.republish_minutes = 0)")
 
     while True:
         try:

@@ -164,6 +164,7 @@ All settings live in `config.yaml`. The only environment variable honoured is `E
 | `ekz.data_dir` | `/app/data` | Data directory inside the container (rarely needs changing) |
 | `home_assistant.url` | *(empty)* | Home Assistant base URL - enables sensor push when set |
 | `home_assistant.token` | *(empty)* | HA Long-Lived Access Token |
+| `home_assistant.republish_minutes` | `15` | Re-push ephemeral sensor states this often so entities survive HA restarts between daily scrapes (`0` disables) |
 | `rsync.target` | *(empty)* | `user@host:/path` - push `data/` after each scrape; empty disables |
 | `log_level` | `INFO` | Log verbosity: `INFO` for normal operation, `DEBUG` to also write browser screenshots and HTML dumps to `data/debug/` |
 | `retention.csv_days` | `90` | Days to keep dated CSV files (0 = keep forever) |
@@ -412,6 +413,16 @@ Set `headless: false` on a desktop machine (not a headless Pi) to watch the brow
 - Verify credentials in `config.yaml`
 - Test login manually at https://my.ekz.ch
 - If you changed your password, update `config.yaml` and restart: `docker compose restart`
+
+**Entities show "entity not found" on the dashboard (but charts still work)**
+- Sensor states are pushed via HA's REST API, which are **ephemeral** — Home
+  Assistant discards them on every restart and the scraper only recreates them
+  on its next run. So after an HA restart the `sensor.ekz_*` tiles break until
+  the next scrape, even though the long-term-statistics charts (`ekz_power:*`)
+  survive. The scraper mitigates this by **re-pushing the states every
+  `home_assistant.republish_minutes` (default 15)** so entities reappear within
+  minutes of any restart. If you still see this, check the container is running
+  and `republish_minutes` isn't set to `0`.
 
 **"No sensors appearing in Home Assistant"**
 - Check `ha_url` and `ha_token` are set in `config.yaml`

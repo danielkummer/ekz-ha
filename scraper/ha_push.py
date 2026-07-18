@@ -769,17 +769,16 @@ def _push_health_sensors(ha_url: str, ha_token: str, data_dir: str) -> None:
         }
     }
     
-    # Scrape age sensor
-    if scrape_age_hours is not None:
-        health_sensors["sensor.ekz_scrape_age_hours"] = {
-            "state": round(scrape_age_hours, 1),
-            "attributes": {
-                "friendly_name": "EKZ Scrape Age",
-                "unit_of_measurement": "h",
-                "icon": "mdi:clock-outline",
-                "device_class": "duration",
-            }
+    # Scrape age sensor — always published (unavailable when no status.json yet)
+    health_sensors["sensor.ekz_scrape_age_hours"] = {
+        "state": round(scrape_age_hours, 1) if scrape_age_hours is not None else "unavailable",
+        "attributes": {
+            "friendly_name": "EKZ Scrape Age",
+            "unit_of_measurement": "h",
+            "icon": "mdi:clock-outline",
+            "device_class": "duration",
         }
+    }
     
     # Data staleness sensor
     is_stale = scrape_age_hours is not None and scrape_age_hours > 30
@@ -804,26 +803,24 @@ def _push_health_sensors(ha_url: str, ha_token: str, data_dir: str) -> None:
         }
     }
     
-    # Disk space sensors
-    if disk_free_mb is not None:
-        health_sensors["sensor.ekz_disk_free_mb"] = {
-            "state": round(disk_free_mb, 0),
-            "attributes": {
-                "friendly_name": "EKZ Disk Free",
-                "unit_of_measurement": "MB",
-                "icon": "mdi:harddisk",
-            }
+    # Disk space sensors — always published (unavailable when unreadable)
+    health_sensors["sensor.ekz_disk_free_mb"] = {
+        "state": round(disk_free_mb, 0) if disk_free_mb is not None else "unavailable",
+        "attributes": {
+            "friendly_name": "EKZ Disk Free",
+            "unit_of_measurement": "MB",
+            "icon": "mdi:harddisk",
         }
-    
-    if disk_free_pct is not None:
-        health_sensors["sensor.ekz_disk_free_percent"] = {
-            "state": round(disk_free_pct, 1),
-            "attributes": {
-                "friendly_name": "EKZ Disk Free %",
-                "unit_of_measurement": "%",
-                "icon": "mdi:harddisk",
-            }
+    }
+
+    health_sensors["sensor.ekz_disk_free_percent"] = {
+        "state": round(disk_free_pct, 1) if disk_free_pct is not None else "unavailable",
+        "attributes": {
+            "friendly_name": "EKZ Disk Free %",
+            "unit_of_measurement": "%",
+            "icon": "mdi:harddisk",
         }
+    }
     
     push_states(ha_url, ha_token, health_sensors)
     logger.debug("Pushed %d health sensors", len(health_sensors))
@@ -865,58 +862,61 @@ def _calculate_derived_costs(states: dict[str, dict], cost_per_kwh: float = _EST
     
     cost_sensors = {}
 
+    # All cost sensors are ALWAYS published (state "unavailable" when the input
+    # data is missing) so dashboards never show "entity not found" — mirrors the
+    # kWh/bill fallback pattern in build_states().
+
     # Actual blended rate from bills (total billed / YTD consumption).
     # Informational only — estimates below use the configured flat tariff.
-    effective_rate = None
-    if ytd_kwh is not None and ytd_kwh > 0 and total_billed_chf is not None:
-        effective_rate = total_billed_chf / ytd_kwh
-        cost_sensors["sensor.ekz_cost_per_kwh"] = {
-            "state": round(effective_rate, 3),
-            "attributes": {
-                "friendly_name": "EKZ Cost per kWh",
-                "unit_of_measurement": "CHF/kWh",
-                "icon": "mdi:cash",
-            }
+    effective_rate = (
+        total_billed_chf / ytd_kwh
+        if ytd_kwh not in (None, 0) and total_billed_chf is not None
+        else None
+    )
+    cost_sensors["sensor.ekz_cost_per_kwh"] = {
+        "state": round(effective_rate, 3) if effective_rate is not None else "unavailable",
+        "attributes": {
+            "friendly_name": "EKZ Cost per kWh",
+            "unit_of_measurement": "CHF/kWh",
+            "icon": "mdi:cash",
         }
+    }
 
     # Daily cost estimate (configured flat tariff)
-    if latest_day_kwh is not None:
-        daily_cost = latest_day_kwh * cost_per_kwh
-        cost_sensors["sensor.ekz_daily_cost_estimate"] = {
-            "state": round(daily_cost, 2),
-            "attributes": {
-                "friendly_name": "EKZ Daily Cost Estimate",
-                "unit_of_measurement": "CHF",
-                "icon": "mdi:cash",
-                "device_class": "monetary",
-            }
+    daily_cost = latest_day_kwh * cost_per_kwh if latest_day_kwh is not None else None
+    cost_sensors["sensor.ekz_daily_cost_estimate"] = {
+        "state": round(daily_cost, 2) if daily_cost is not None else "unavailable",
+        "attributes": {
+            "friendly_name": "EKZ Daily Cost Estimate",
+            "unit_of_measurement": "CHF",
+            "icon": "mdi:cash",
+            "device_class": "monetary",
         }
+    }
 
     # Current month cost estimate (configured flat tariff)
-    if current_month_kwh is not None:
-        month_cost = current_month_kwh * cost_per_kwh
-        cost_sensors["sensor.ekz_current_month_cost_estimate"] = {
-            "state": round(month_cost, 2),
-            "attributes": {
-                "friendly_name": "EKZ Current Month Cost Estimate",
-                "unit_of_measurement": "CHF",
-                "icon": "mdi:cash",
-                "device_class": "monetary",
-            }
+    month_cost = current_month_kwh * cost_per_kwh if current_month_kwh is not None else None
+    cost_sensors["sensor.ekz_current_month_cost_estimate"] = {
+        "state": round(month_cost, 2) if month_cost is not None else "unavailable",
+        "attributes": {
+            "friendly_name": "EKZ Current Month Cost Estimate",
+            "unit_of_measurement": "CHF",
+            "icon": "mdi:cash",
+            "device_class": "monetary",
         }
-    
+    }
+
     # YTD cost (same as total billed)
-    if total_billed_chf is not None:
-        cost_sensors["sensor.ekz_ytd_cost"] = {
-            "state": round(total_billed_chf, 2),
-            "attributes": {
-                "friendly_name": "EKZ Year-to-Date Cost",
-                "unit_of_measurement": "CHF",
-                "icon": "mdi:cash-multiple",
-                "device_class": "monetary",
-            }
+    cost_sensors["sensor.ekz_ytd_cost"] = {
+        "state": round(total_billed_chf, 2) if total_billed_chf is not None else "unavailable",
+        "attributes": {
+            "friendly_name": "EKZ Year-to-Date Cost",
+            "unit_of_measurement": "CHF",
+            "icon": "mdi:cash-multiple",
+            "device_class": "monetary",
         }
-    
+    }
+
     return cost_sensors
 
 
@@ -984,75 +984,70 @@ def _calculate_projected_month_end(data_dir: str, cost_per_kwh: float = _EST_COS
 
 
 def _push_projected_sensors(ha_url: str, ha_token: str, data_dir: str, cost_per_kwh: float = _EST_COST_PER_KWH) -> None:
-    """Push projected month-end sensors to Home Assistant."""
+    """Push projected month-end sensors to Home Assistant.
+
+    Both entities are always published (state "unavailable" when there is not
+    enough data to project) so dashboards never show "entity not found".
+    """
     projection = _calculate_projected_month_end(data_dir, cost_per_kwh)
-    
-    if not projection:
-        logger.debug("No projection calculated (insufficient data)")
-        return
-    
-    # Push projected kWh sensor
-    kwh_payload = {
-        "state": projection["projected_month_kwh"],
-        "attributes": {
-            "friendly_name": "Projected Month-End kWh",
-            "unit_of_measurement": "kWh",
-            "state_class": "measurement",
-            "device_class": "energy",
-            "icon": "mdi:chart-timeline-variant",
+
+    if projection:
+        kwh_state = projection["projected_month_kwh"]
+        cost_state = projection["projected_month_cost"]
+        extra_kwh = {
             "days_elapsed": projection["days_elapsed"],
             "days_in_month": projection["days_in_month"],
             "daily_average": projection["daily_avg"],
-        },
-    }
-    
-    # Push projected cost sensor
-    cost_payload = {
-        "state": projection["projected_month_cost"],
-        "attributes": {
-            "friendly_name": "Projected Month-End Cost",
-            "unit_of_measurement": "CHF",
-            "state_class": "measurement",
-            "device_class": "monetary",
-            "icon": "mdi:cash-clock",
+        }
+        extra_cost = {
             "days_elapsed": projection["days_elapsed"],
             "days_in_month": projection["days_in_month"],
             "daily_average_cost": round(projection["daily_avg"] * cost_per_kwh, 2),
+        }
+    else:
+        logger.debug("No projection calculated (insufficient data) — publishing unavailable")
+        kwh_state = "unavailable"
+        cost_state = "unavailable"
+        extra_kwh = {}
+        extra_cost = {}
+
+    sensors = {
+        "sensor.ekz_projected_month_kwh": {
+            "state": kwh_state,
+            "attributes": {
+                "friendly_name": "Projected Month-End kWh",
+                "unit_of_measurement": "kWh",
+                "state_class": "measurement",
+                "device_class": "energy",
+                "icon": "mdi:chart-timeline-variant",
+                **extra_kwh,
+            },
+        },
+        "sensor.ekz_projected_month_cost": {
+            "state": cost_state,
+            "attributes": {
+                "friendly_name": "Projected Month-End Cost",
+                "unit_of_measurement": "CHF",
+                "state_class": "measurement",
+                "device_class": "monetary",
+                "icon": "mdi:cash-clock",
+                **extra_cost,
+            },
         },
     }
-    
-    try:
-        # Push kWh projection
-        resp = requests.post(
-            f"{ha_url}/api/states/sensor.ekz_projected_month_kwh",
-            headers={"Authorization": f"Bearer {ha_token}"},
-            json=kwh_payload,
-            timeout=_REST_TIMEOUT,
-        )
-        resp.raise_for_status()
-        logger.debug("Pushed sensor.ekz_projected_month_kwh: %.2f kWh", projection["projected_month_kwh"])
-        
-        # Push cost projection
-        resp = requests.post(
-            f"{ha_url}/api/states/sensor.ekz_projected_month_cost",
-            headers={"Authorization": f"Bearer {ha_token}"},
-            json=cost_payload,
-            timeout=_REST_TIMEOUT,
-        )
-        resp.raise_for_status()
-        logger.debug("Pushed sensor.ekz_projected_month_cost: %.2f CHF", projection["projected_month_cost"])
-    except Exception as e:
-        logger.warning("Failed to push projected sensors: %s", e)
+
+    push_states(ha_url, ha_token, sensors)
+    logger.debug("Pushed %d projected sensors", len(sensors))
 
 
 def _push_rolling_average_sensors(ha_url: str, ha_token: str, data_dir: str, cost_per_kwh: float = _EST_COST_PER_KWH) -> None:
-    """Push rolling average sensors (7d, 30d, 90d) to Home Assistant."""
+    """Push rolling average sensors (7d, 30d, 90d) to Home Assistant.
+
+    Entities are always published (state "unavailable" when there is not enough
+    daily history yet) so dashboards never show "entity not found".
+    """
     averages = _calculate_rolling_averages(data_dir, cost_per_kwh)
-    
-    if not averages:
-        logger.debug("No rolling averages calculated (insufficient data)")
-        return
-    
+
     sensor_map = {
         "avg_7d_kwh": ("sensor.ekz_avg_7d_kwh", "7-Day Average kWh", "kWh"),
         "avg_30d_kwh": ("sensor.ekz_avg_30d_kwh", "30-Day Average kWh", "kWh"),
@@ -1061,14 +1056,12 @@ def _push_rolling_average_sensors(ha_url: str, ha_token: str, data_dir: str, cos
         "avg_30d_cost": ("sensor.ekz_avg_30d_cost", "30-Day Average Cost", "CHF"),
         "avg_90d_cost": ("sensor.ekz_avg_90d_cost", "90-Day Average Cost", "CHF"),
     }
-    
+
+    sensors: dict[str, dict] = {}
     for key, (entity_id, friendly_name, unit) in sensor_map.items():
         value = averages.get(key)
-        if value is None:
-            continue
-        
-        payload = {
-            "state": value,
+        sensors[entity_id] = {
+            "state": value if value is not None else "unavailable",
             "attributes": {
                 "friendly_name": friendly_name,
                 "unit_of_measurement": unit,
@@ -1077,27 +1070,36 @@ def _push_rolling_average_sensors(ha_url: str, ha_token: str, data_dir: str, cos
                 "icon": "mdi:chart-line" if "kwh" in key else "mdi:currency-chf",
             },
         }
-        
-        try:
-            resp = requests.post(
-                f"{ha_url}/api/states/{entity_id}",
-                headers={"Authorization": f"Bearer {ha_token}"},
-                json=payload,
-                timeout=_REST_TIMEOUT,
-            )
-            resp.raise_for_status()
-            logger.debug("Pushed %s: %.2f %s", entity_id, value, unit)
-        except Exception as e:
-            logger.warning("Failed to push %s: %s", entity_id, e)
+
+    push_states(ha_url, ha_token, sensors)
+    logger.debug("Pushed %d rolling-average sensors", len(sensors))
 
 
-def push_to_ha(ha_url: str, ha_token: str, data_dir: str, cost_per_kwh: float = _EST_COST_PER_KWH) -> None:
-    """Read all scraped data and push everything to Home Assistant."""
+def push_to_ha(
+    ha_url: str,
+    ha_token: str,
+    data_dir: str,
+    cost_per_kwh: float = _EST_COST_PER_KWH,
+    *,
+    include_statistics: bool = True,
+) -> None:
+    """Read all scraped data and push everything to Home Assistant.
+
+    States pushed via the REST ``/api/states`` API are **ephemeral** — Home
+    Assistant discards them on restart and only recreates them on the next
+    push. To keep the dashboard alive between daily scrapes this function is
+    also called periodically (see ``republish_to_ha``); on those calls
+    ``include_statistics=False`` skips the (already-persistent) long-term
+    statistics injection so re-publishing stays cheap.
+    """
     if not ha_url or not ha_token:
         logger.debug("HA push disabled (ha_url / ha_token not configured)")
         return
 
-    logger.info("Pushing data to Home Assistant (%s)", ha_url)
+    logger.info(
+        "Pushing data to Home Assistant (%s)%s",
+        ha_url, "" if include_statistics else " [states-only re-push]",
+    )
 
     csv_dir   = Path(data_dir) / "csv"
     bills_csv = Path(data_dir) / "bills" / "bills.csv"
@@ -1113,12 +1115,13 @@ def push_to_ha(ha_url: str, ha_token: str, data_dir: str, cost_per_kwh: float = 
                 logger.debug("Pushed %d derived cost sensors", len(cost_sensors))
         else:
             logger.warning("HA push: no sensor data available yet")
-        inject_bill_statistics(ha_url, ha_token, bills_csv)
-        inject_daily_kwh_statistics(ha_url, ha_token, csv_dir)
-        inject_monthly_kwh_statistics(ha_url, ha_token, csv_dir)
-        # Inject cost long-term statistics (chartable cost over time)
-        inject_daily_cost_statistics(ha_url, ha_token, csv_dir, cost_per_kwh)
-        inject_monthly_cost_statistics(ha_url, ha_token, csv_dir, cost_per_kwh)
+        if include_statistics:
+            inject_bill_statistics(ha_url, ha_token, bills_csv)
+            inject_daily_kwh_statistics(ha_url, ha_token, csv_dir)
+            inject_monthly_kwh_statistics(ha_url, ha_token, csv_dir)
+            # Inject cost long-term statistics (chartable cost over time)
+            inject_daily_cost_statistics(ha_url, ha_token, csv_dir, cost_per_kwh)
+            inject_monthly_cost_statistics(ha_url, ha_token, csv_dir, cost_per_kwh)
         # Push health sensors
         _push_health_sensors(ha_url, ha_token, data_dir)
         # Push rolling average sensors
@@ -1137,6 +1140,18 @@ def push_to_ha(ha_url: str, ha_token: str, data_dir: str, cost_per_kwh: float = 
             logger.debug("Pushed HA connectivity sensors")
         except Exception:
             logger.debug("Could not push HA connectivity sensors")
+
+
+def republish_to_ha(
+    ha_url: str, ha_token: str, data_dir: str, cost_per_kwh: float = _EST_COST_PER_KWH
+) -> None:
+    """Re-push the current sensor states without re-injecting statistics.
+
+    Called on a short interval so ephemeral REST states reappear within minutes
+    of any Home Assistant restart, instead of staying missing until the next
+    daily scrape. Long-term statistics persist in HA and are not re-sent here.
+    """
+    push_to_ha(ha_url, ha_token, data_dir, cost_per_kwh, include_statistics=False)
 
 
 def _track_ha_push_result(data_dir: str, *, success: bool, error: str = "") -> None:

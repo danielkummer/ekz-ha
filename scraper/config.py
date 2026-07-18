@@ -35,6 +35,7 @@ class Config:
     log_level: str = "INFO"
     max_retries: int = 3
     retry_backoff_base_minutes: int = 15
+    ha_republish_minutes: int = 15  # re-push ephemeral HA states this often (0 = disabled)
     cost_per_kwh: float = 0.25  # flat tariff (CHF/kWh) for cost estimates & statistics
     retention: RetentionConfig = field(default_factory=RetentionConfig)
 
@@ -137,6 +138,11 @@ def load_config() -> Config:
     retry_backoff_base_minutes = _int(
         ekz, "retry_backoff_base_minutes", 15, 1, 240, "ekz.retry_backoff_base_minutes"
     )
+    # How often to re-push ephemeral HA states so entities survive HA restarts.
+    # 0 disables periodic re-pushing (states then persist only until next scrape).
+    ha_republish_minutes = _int(
+        ha, "republish_minutes", 15, 0, 1440, "home_assistant.republish_minutes"
+    )
 
     def _days(key: str, default: int) -> int:
         raw = retention.get(key, default)
@@ -187,6 +193,7 @@ def load_config() -> Config:
         log_level=log_level,
         max_retries=max_retries,
         retry_backoff_base_minutes=retry_backoff_base_minutes,
+        ha_republish_minutes=ha_republish_minutes,
         cost_per_kwh=cost_per_kwh,
         retention=retention_cfg,
     )

@@ -27,6 +27,11 @@ home_assistant:
   url: http://homeassistant.local:8123
   # Long-Lived Access Token — create one at http://<ha-host>:8123/profile/security
   token: your_long_lived_access_token
+  # Sensor states are pushed via the REST API, which HA drops on restart. To
+  # keep the dashboard alive between the once-daily scrapes, the scraper
+  # re-pushes the current states every N minutes so entities reappear shortly
+  # after any HA restart. Set to 0 to disable. Default: 15.
+  republish_minutes: 15
 
 rsync:
   # Push the data/ directory to a remote host after each scrape.
