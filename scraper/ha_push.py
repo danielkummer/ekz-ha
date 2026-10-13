@@ -411,7 +411,8 @@ async def _ws_inject_statistics(ha_url: str, ha_token: str, bills: list[dict]) -
                 "name":               "EKZ Monthly Cost",
                 "source":             "ekz_power",
                 "unit_of_measurement": "CHF",
-                "has_mean": False,
+                "unit_class":           None,
+                "mean_type": 0,  # StatisticMeanType.NONE (replaces deprecated has_mean)
                 "has_sum":  True,
             },
             "stats": stat_rows,
@@ -512,7 +513,8 @@ async def _ws_inject_daily_kwh(ha_url: str, ha_token: str, stat_rows: list[dict]
                 "name":                "EKZ Daily kWh",
                 "source":              "ekz_power",
                 "unit_of_measurement": "kWh",
-                "has_mean": False,
+                "unit_class":           "energy",
+                "mean_type": 0,  # StatisticMeanType.NONE (replaces deprecated has_mean)
                 "has_sum":  True,
             },
             "stats": stat_rows,
@@ -601,7 +603,8 @@ async def _ws_inject_monthly_kwh(ha_url: str, ha_token: str, stat_rows: list[dic
                 "name":                "EKZ Monthly kWh",
                 "source":              "ekz_power",
                 "unit_of_measurement": "kWh",
-                "has_mean": False,
+                "unit_class":           "energy",
+                "mean_type": 0,  # StatisticMeanType.NONE (replaces deprecated has_mean)
                 "has_sum":  True,
             },
             "stats": stat_rows,
@@ -674,7 +677,8 @@ async def _ws_inject_cost_stats(
                 "name":                name,
                 "source":              "ekz_power",
                 "unit_of_measurement": "CHF",
-                "has_mean": False,
+                "unit_class":           None,
+                "mean_type": 0,  # StatisticMeanType.NONE (replaces deprecated has_mean)
                 "has_sum":  True,
             },
             "stats": stat_rows,
